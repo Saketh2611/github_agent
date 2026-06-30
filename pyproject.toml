@@ -1,0 +1,24 @@
+[project]
+name = "github-agent"
+version = "0.1.0"
+description = "Autonomous Platform Intelligence Agent for GitHub"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27.0",
+    "boto3>=1.35.0",
+    "supabase>=2.9.0",
+    "typer[all]>=0.12.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "rich>=13.9.0",
+    "tenacity>=9.0.0",
+    "numpy>=1.26.0",
+]
+
+[project.scripts]
+agent = "src.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
