@@ -2,6 +2,7 @@ import json
 import time
 from typing import Any
 
+from src.config import settings
 from src.llm import llm
 from src.tools.github_client import GitHubClient, GitHubAPIError
 from src.memory.capability_memory import CapabilityMemory
@@ -74,11 +75,20 @@ class StepExecutor:
                 step_num = int(parts[0].replace("$step_", ""))
                 if step_num in prior_results and prior_results[step_num].get("status") == "success":
                     data = prior_results[step_num].get("data", {})
+                    # Unwrap {"items": [...]} to list for easier traversal
+                    if isinstance(data, dict) and "items" in data and len(parts) > 1 and parts[1] != "items":
+                        data = data["items"]
                     for part in parts[1:]:
                         if isinstance(data, dict):
                             data = data.get(part, value)
                         elif isinstance(data, list) and part.isdigit():
                             data = data[int(part)] if int(part) < len(data) else value
+                        elif isinstance(data, list) and not part.isdigit():
+                            # Try first item in list
+                            if data and isinstance(data[0], dict):
+                                data = data[0].get(part, value)
+                            else:
+                                break
                     resolved[key] = data
                 else:
                     resolved[key] = value
@@ -93,6 +103,10 @@ class StepExecutor:
             placeholder = "{" + key + "}"
             if placeholder in endpoint:
                 endpoint = endpoint.replace(placeholder, str(value))
+        if "{owner}" in endpoint and settings.github_default_owner:
+            endpoint = endpoint.replace("{owner}", settings.github_default_owner)
+        if "{repo}" in endpoint and settings.github_default_repo:
+            endpoint = endpoint.replace("{repo}", settings.github_default_repo)
         return endpoint
 
     def _extract_query_params(self, params: dict, capability: dict) -> dict | None:

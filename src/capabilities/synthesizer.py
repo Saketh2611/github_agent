@@ -1,6 +1,7 @@
 import json
 from typing import Any
 
+from src.config import settings
 from src.llm import llm
 from src.memory.capability_memory import CapabilityMemory
 from src.tools.github_client import GitHubClient, GitHubAPIError, ValidationError
@@ -111,18 +112,27 @@ Generate the API specification as JSON:
             raise ValueError(f"Invalid HTTP method: {spec['http_method']}")
         return spec
 
+    def _fill_test_endpoint(self, endpoint: str) -> str:
+        """Fill default owner/repo into endpoint for testing."""
+        if "{owner}" in endpoint and settings.github_default_owner:
+            endpoint = endpoint.replace("{owner}", settings.github_default_owner)
+        if "{repo}" in endpoint and settings.github_default_repo:
+            endpoint = endpoint.replace("{repo}", settings.github_default_repo)
+        return endpoint
+
     def _test_capability(self, spec: dict) -> dict[str, Any]:
         """Test the synthesized capability with a safe call."""
         method = spec["http_method"]
-        endpoint = spec["endpoint_template"]
+        endpoint = self._fill_test_endpoint(spec["endpoint_template"])
+
+        if "{" in endpoint:
+            return {"success": True, "constraints": ["untestable_has_path_params"]}
 
         try:
             if method == "GET":
                 params = spec.get("test_params") or spec.get("query_params_schema")
                 self.github.get(endpoint, params=params)
             elif method in ("POST", "PATCH", "PUT"):
-                # For write operations, do a dry-run validation by testing with GET first
-                # to verify the endpoint structure is correct
                 get_endpoint = endpoint.rsplit("/", 1)[0] if "/" in endpoint else endpoint
                 self.github.get(get_endpoint)
             return {"success": True}

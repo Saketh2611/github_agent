@@ -121,6 +121,41 @@ def _display_report(report):
         console.print(f"  {icon} Step {i}: {step['description']} [{result['status']}]")
         if result.get("error"):
             console.print(f"    [red]→ {result['error'][:120]}[/red]")
+        if result.get("data"):
+            _display_data(result["data"])
+
+
+def _display_data(data):
+    """Display API response data in a readable format."""
+    if isinstance(data, dict) and "items" in data and isinstance(data["items"], list):
+        data = data["items"]
+    if isinstance(data, list):
+        if not data:
+            console.print("\n  [yellow]No results found.[/yellow]")
+            return
+        console.print(f"\n  [bold]Results ({len(data)} items):[/bold]")
+        for item in data[:20]:
+            if isinstance(item, dict):
+                if "title" in item and "number" in item:
+                    state = item.get("state", "")
+                    labels = ", ".join(l["name"] for l in item.get("labels", []) if isinstance(l, dict))
+                    label_str = f" [dim]\\[{labels}][/dim]" if labels else ""
+                    console.print(f"    #{item['number']} {item['title']} [dim]({state}){label_str}[/dim]")
+                elif "name" in item and "full_name" in item:
+                    console.print(f"    {item['full_name']} [dim]({item.get('visibility', '')})[/dim]")
+                elif "name" in item:
+                    console.print(f"    {item['name']}")
+                else:
+                    console.print(f"    {json.dumps(item, indent=2)[:200]}")
+            else:
+                console.print(f"    {item}")
+    elif isinstance(data, dict):
+        if "title" in data and "number" in data:
+            console.print(f"\n  #{data['number']} {data['title']}")
+            if data.get("body"):
+                console.print(f"  [dim]{data['body'][:200]}[/dim]")
+        else:
+            console.print(Syntax(json.dumps(data, indent=2)[:1000], "json", theme="monokai"))
 
 
 if __name__ == "__main__":

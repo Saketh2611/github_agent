@@ -2,10 +2,13 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    aws_access_key_id: str
-    aws_secret_access_key: str
-    aws_region: str = "us-east-1"
-    bedrock_model_id: str = "oss-20b"
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "ap-south-1"
+    bedrock_model_id: str = "openai.gpt-oss-20b-1:0"
 
     supabase_url: str
     supabase_key: str
