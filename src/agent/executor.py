@@ -72,11 +72,19 @@ class StepExecutor:
         for key, value in params.items():
             if isinstance(value, str) and value.startswith("$step_"):
                 parts = value.split(".")
-                step_num = int(parts[0].replace("$step_", ""))
+                step_ref = parts[0]
+                # Extract step number (handle "$step_1" format)
+                try:
+                    step_num = int(step_ref.replace("$step_", ""))
+                except ValueError:
+                    resolved[key] = value
+                    continue
                 if step_num in prior_results and prior_results[step_num].get("status") == "success":
                     data = prior_results[step_num].get("data", {})
                     # Unwrap {"items": [...]} to list for easier traversal
                     if isinstance(data, dict) and "items" in data and len(parts) > 1 and parts[1] != "items":
+                        data = data["items"]
+                    elif isinstance(data, dict) and "items" in data and len(parts) == 1:
                         data = data["items"]
                     for part in parts[1:]:
                         if isinstance(data, dict):
@@ -89,12 +97,39 @@ class StepExecutor:
                                 data = data[0].get(part, value)
                             else:
                                 break
+                    # If data is a list and being used as a string param (like body), format it
+                    if isinstance(data, list) and key in ("body", "description"):
+                        data = self._format_as_markdown_table(data)
                     resolved[key] = data
                 else:
                     resolved[key] = value
             else:
                 resolved[key] = value
         return resolved
+
+    def _format_as_markdown_table(self, items: list) -> str:
+        """Format a list of dicts as a markdown table."""
+        if not items:
+            return "No items found."
+        display_keys = ["number", "title", "state", "assignee", "created_at"]
+        keys = [k for k in display_keys if any(isinstance(item, dict) and k in item for item in items)]
+        if not keys:
+            keys = list(items[0].keys())[:5] if isinstance(items[0], dict) else []
+        if not keys:
+            return str(items)
+        header = "| " + " | ".join(keys) + " |"
+        separator = "| " + " | ".join("---" for _ in keys) + " |"
+        rows = []
+        for item in items:
+            if isinstance(item, dict):
+                cells = []
+                for k in keys:
+                    val = item.get(k, "")
+                    if isinstance(val, dict):
+                        val = val.get("login", str(val))
+                    cells.append(str(val) if val else "")
+                rows.append("| " + " | ".join(cells) + " |")
+        return "\n".join([header, separator] + rows)
 
     def _build_endpoint(self, template: str, params: dict) -> str:
         """Fill in path parameters in the endpoint template."""

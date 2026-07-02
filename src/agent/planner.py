@@ -39,7 +39,10 @@ Each step must have:
 - "params": dict of parameters needed (MUST include "owner" and "repo" for endpoints that require them)
 - "depends_on": list of step numbers this depends on (empty if independent)
 
+IMPORTANT: All param values MUST be valid JSON literals (strings, numbers, booleans, arrays, objects). Do NOT use JavaScript expressions, string concatenation (+), template literals, or function calls in param values.
+
 For params referencing prior step results, use "$step_N.field" syntax (e.g., "$step_1.0.number" to get the number field from the first item in step 1's result list).
+For params that need the full result from a prior step (e.g., a list of issues to format as a table), just use "$step_N" — the agent will format it appropriately.
 
 Respond as: {{"steps": [...]}}"""
 
