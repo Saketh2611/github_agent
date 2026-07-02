@@ -98,7 +98,7 @@ supabase db push
 ### 6. Seed base capabilities
 
 ```bash
-python main.py seed
+agent seed
 ```
 
 This registers the initial set of API capabilities (list issues, create issues, update issues, comments, PRs, etc.). The agent can synthesize additional capabilities at runtime as needed.
@@ -108,29 +108,29 @@ This registers the initial set of API capabilities (list issues, create issues, 
 ### Run an instruction
 
 ```bash
-python main.py run "<natural language instruction>"
+agent run "<natural language instruction>"
 ```
 
 **Examples:**
 
 ```bash
 # List open issues
-python main.py run "list open issues in my repo"
+agent run "list open issues in my repo"
 
 # Create an issue
-python main.py run "Create a bug report issue titled 'Login timeout on mobile' with labels bug and high-priority"
+agent run "Create a bug report issue titled 'Login timeout on mobile' with labels bug and high-priority"
 
 # Close an issue with a comment
-python main.py run "close the Test Issue with the comment (test issue resolved)"
+agent run "close the Test Issue with the comment (test issue resolved)"
 
 # Multi-step operations
-python main.py run "Find all open issues labeled 'bug' and create a summary issue with a markdown table"
+agent run "Find all open issues labeled 'bug' and create a summary issue with a markdown table"
 ```
 
 ### View registered capabilities
 
 ```bash
-python main.py capabilities
+agent capabilities
 ```
 
 Shows all capabilities the agent knows about, including ones synthesized at runtime.
@@ -138,8 +138,8 @@ Shows all capabilities the agent knows about, including ones synthesized at runt
 ### View learning report
 
 ```bash
-python main.py learn
-python main.py learn "bug"  # filter by pattern
+agent learn
+agent learn "bug"  # filter by pattern
 ```
 
 Shows execution statistics and improvement signals:
@@ -160,7 +160,7 @@ DELETE FROM capabilities;
 Then:
 
 ```bash
-python main.py seed
+agent seed
 ```
 
 ## How It Works
@@ -232,7 +232,7 @@ User Instruction
 | `Bad credentials` (401) | Regenerate your GitHub token with `repo` scope |
 | `Not Found` (404) | Check `GITHUB_DEFAULT_OWNER` and `GITHUB_DEFAULT_REPO` in `.env` |
 | `row-level security policy` | Use the Supabase **service role key**, not the anon key |
-| `Capability synthesis failed` | Run `python main.py seed` to ensure base capabilities exist |
+| `Capability synthesis failed` | Run `agent seed` to ensure base capabilities exist |
 | `No LLM configured` | Set `GROQ_API_KEY` in `.env` |
 | `Groq unavailable` | The client retries 3 times; check your Groq quota |
 
