@@ -71,6 +71,22 @@ BASE_CAPABILITIES = [
         "query_params_schema": {"state": "open|closed|all", "sort": "created|updated|popularity", "per_page": "int"},
     },
     {
+        "name": "get_pull",
+        "description": "Get a single pull request by number, including title, body, state, user, and diff stats",
+        "http_method": "GET",
+        "endpoint_template": "/repos/{owner}/{repo}/pulls/{pull_number}",
+        "payload_schema": None,
+        "query_params_schema": None,
+    },
+    {
+        "name": "list_pull_files",
+        "description": "List files changed in a pull request with additions, deletions, and patch details",
+        "http_method": "GET",
+        "endpoint_template": "/repos/{owner}/{repo}/pulls/{pull_number}/files",
+        "payload_schema": None,
+        "query_params_schema": {"per_page": "int", "page": "int"},
+    },
+    {
         "name": "create_pull",
         "description": "Create a pull request",
         "http_method": "POST",

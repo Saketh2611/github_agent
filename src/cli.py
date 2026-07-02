@@ -141,6 +141,9 @@ def _display_data(data):
                     labels = ", ".join(l["name"] for l in item.get("labels", []) if isinstance(l, dict))
                     label_str = f" [dim]\\[{labels}][/dim]" if labels else ""
                     console.print(f"    #{item['number']} {item['title']} [dim]({state}){label_str}[/dim]")
+                elif "filename" in item and "additions" in item:
+                    status = item.get("status", "")
+                    console.print(f"    {item['filename']} (+{item['additions']} -{item['deletions']}) [dim]({status})[/dim]")
                 elif "name" in item and "full_name" in item:
                     console.print(f"    {item['full_name']} [dim]({item.get('visibility', '')})[/dim]")
                 elif "name" in item:
