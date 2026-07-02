@@ -117,7 +117,7 @@ def _display_report(report):
     for i, sr in enumerate(report.step_results, 1):
         step = sr["step"]
         result = sr["result"]
-        icon = {"success": "[green]✓[/green]", "failed": "[red]✗[/red]", "skipped": "[dim]○[/dim]"}.get(result["status"], "?")
+        icon = {"success": "[green]OK[/green]", "failed": "[red]FAIL[/red]", "skipped": "[dim]SKIP[/dim]"}.get(result["status"], "?")
         console.print(f"  {icon} Step {i}: {step['description']} [{result['status']}]")
         if result.get("error"):
             console.print(f"    [red]→ {result['error'][:120]}[/red]")

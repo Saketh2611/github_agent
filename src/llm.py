@@ -36,12 +36,7 @@ class GroqLLM:
             "You MUST respond with valid JSON only. No markdown, no explanation, no extra text."
         )
         raw = self.invoke(prompt, system=system_with_json, temperature=temperature)
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-        return json.loads(cleaned)
+        return _parse_json_response(raw)
 
 
 class BedrockLLM:
@@ -80,12 +75,48 @@ class BedrockLLM:
             "You MUST respond with valid JSON only. No markdown, no explanation, no extra text."
         )
         raw = self.invoke(prompt, system=system_with_json, temperature=temperature)
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
+        return _parse_json_response(raw)
+
+
+def _parse_json_response(raw: str) -> dict:
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+    try:
         return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    # Try to extract the first JSON object from the response
+    start = cleaned.find("{")
+    if start == -1:
+        raise ValueError(f"No JSON object found in LLM response: {raw[:200]}")
+    depth = 0
+    in_string = False
+    escape_next = False
+    for i in range(start, len(cleaned)):
+        c = cleaned[i]
+        if escape_next:
+            escape_next = False
+            continue
+        if c == "\\":
+            if in_string:
+                escape_next = True
+            continue
+        if c == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(cleaned[start:i + 1])
+    return json.loads(cleaned[start:])
 
 
 def _create_llm():
