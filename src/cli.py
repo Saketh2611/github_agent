@@ -10,11 +10,21 @@ console = Console()
 
 
 @app.command()
-def run(instruction: str = typer.Argument(..., help="Natural language instruction to execute")):
+def run(
+    instruction: str = typer.Argument(..., help="Natural language instruction to execute"),
+    repo: str = typer.Option("", "--repo", "-r", help="Target repo as 'owner/repo' (auto-detected from git remote if omitted)"),
+):
     """Execute a natural language instruction on GitHub."""
     from src.agent.core import AgentCore
+    from src.config import settings
 
-    console.print(Panel(f"[bold]{instruction}[/bold]", title="Instruction", border_style="blue"))
+    if repo and "/" in repo:
+        owner, name = repo.split("/", 1)
+        settings.github_default_owner = owner
+        settings.github_default_repo = name
+
+    target = f"{settings.github_default_owner}/{settings.github_default_repo}" if settings.github_default_owner else "no repo detected"
+    console.print(Panel(f"[bold]{instruction}[/bold]\n[dim]Target: {target}[/dim]", title="Instruction", border_style="blue"))
 
     agent = AgentCore()
     report = agent.run(instruction)
