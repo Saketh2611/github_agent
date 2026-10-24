@@ -3,9 +3,8 @@ import json
 from typing import Any
 from dataclasses import dataclass, field
 
-from supabase import create_client
-
 from src.config import settings
+from DB.database import Database
 from src.llm import llm
 from src.tools.github_client import GitHubClient
 from src.memory.execution_memory import ExecutionMemory
@@ -48,13 +47,18 @@ class ExecutionReport:
 
 class AgentCore:
     def __init__(self):
-        db = create_client(settings.supabase_url, settings.supabase_key)
+        self.db = Database(settings.database_url or None)
+        self.db_session = self.db.create_session()
         self.github = GitHubClient()
-        self.execution_memory = ExecutionMemory(db)
-        self.capability_memory = CapabilityMemory(db)
+        self.execution_memory = ExecutionMemory(self.db_session)
+        self.capability_memory = CapabilityMemory(self.db_session)
         self.synthesizer = CapabilitySynthesizer(self.capability_memory, self.github)
         self.feedback = FeedbackLoop(self.execution_memory, self.capability_memory)
         self.executor = StepExecutor(self.github, self.capability_memory)
+
+    def close(self) -> None:
+        self.db_session.close()
+        self.db.close()
 
     def run(self, instruction: str) -> ExecutionReport:
         """Execute a natural language instruction end-to-end."""

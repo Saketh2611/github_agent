@@ -1,11 +1,13 @@
 import json
 from datetime import datetime, timezone
-from typing import Any
-from supabase import Client
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
+
+from DB.models import Capability
 
 
 class CapabilityMemory:
-    def __init__(self, db: Client):
+    def __init__(self, db: Session):
         self.db = db
 
     def register_capability(
@@ -34,60 +36,70 @@ class CapabilityMemory:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "last_used_at": datetime.now(timezone.utc).isoformat(),
         }
-        response = self.db.table("capabilities").upsert(record, on_conflict="name").execute()
-        return response.data[0] if response.data else record
+        capability = self.db.scalar(
+            select(Capability).where(Capability.name == name)
+        )
+        if capability is None:
+            capability = Capability(**record)
+            self.db.add(capability)
+        else:
+            for key, value in record.items():
+                setattr(capability, key, value)
+        self.db.commit()
+        self.db.refresh(capability)
+        return capability.to_dict()
 
     def find_capability(self, name: str) -> dict | None:
-        response = (
-            self.db.table("capabilities")
-            .select("*")
-            .eq("name", name)
-            .limit(1)
-            .execute()
+        capability = self.db.scalar(
+            select(Capability).where(Capability.name == name).limit(1)
         )
-        return response.data[0] if response.data else None
+        return capability.to_dict() if capability else None
 
     def search_capabilities(self, query: str, limit: int = 5) -> list[dict]:
-        response = (
-            self.db.table("capabilities")
-            .select("*")
-            .or_(f"name.ilike.%{query}%,description.ilike.%{query}%")
-            .order("success_rate", desc=True)
+        statement = (
+            select(Capability)
+            .where(
+                or_(
+                    Capability.name.ilike(f"%{query}%"),
+                    Capability.description.ilike(f"%{query}%"),
+                )
+            )
+            .order_by(Capability.success_rate.desc())
             .limit(limit)
-            .execute()
         )
-        return response.data or []
+        return [cap.to_dict() for cap in self.db.scalars(statement)]
 
     def record_usage(self, name: str, success: bool, constraint: str | None = None):
-        cap = self.find_capability(name)
+        cap = self.db.scalar(select(Capability).where(Capability.name == name))
         if not cap:
             return
 
-        updates: dict[str, Any] = {"last_used_at": datetime.now(timezone.utc).isoformat()}
+        cap.last_used_at = datetime.now(timezone.utc).isoformat()
         if success:
-            updates["success_count"] = cap["success_count"] + 1
+            cap.success_count += 1
         else:
-            updates["failure_count"] = cap["failure_count"] + 1
+            cap.failure_count += 1
 
-        total = (cap["success_count"] + (1 if success else 0)) + (cap["failure_count"] + (0 if success else 1))
-        updates["success_rate"] = round((cap["success_count"] + (1 if success else 0)) / total, 3)
+        total = cap.success_count + cap.failure_count
+        cap.success_rate = round(cap.success_count / total, 3)
 
         if constraint:
-            existing = json.loads(cap["discovered_constraints"]) if cap["discovered_constraints"] else []
+            existing = (
+                json.loads(cap.discovered_constraints)
+                if cap.discovered_constraints
+                else []
+            )
             if constraint not in existing:
                 existing.append(constraint)
-                updates["discovered_constraints"] = json.dumps(existing)
-
-        self.db.table("capabilities").update(updates).eq("name", name).execute()
+                cap.discovered_constraints = json.dumps(existing)
+        self.db.commit()
 
     def get_all_capabilities(self) -> list[dict]:
-        response = (
-            self.db.table("capabilities")
-            .select("name, description, http_method, endpoint_template, success_rate, synthesized")
-            .order("success_rate", desc=True)
-            .execute()
+        statement = (
+            select(Capability)
+            .order_by(Capability.success_rate.desc())
         )
-        return response.data or []
+        return [cap.to_summary_dict() for cap in self.db.scalars(statement)]
 
     def get_capability_summary(self) -> str:
         caps = self.get_all_capabilities()

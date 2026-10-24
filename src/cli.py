@@ -27,7 +27,10 @@ def run(
     console.print(Panel(f"[bold]{instruction}[/bold]\n[dim]Target: {target}[/dim]", title="Instruction", border_style="blue"))
 
     agent = AgentCore()
-    report = agent.run(instruction)
+    try:
+        report = agent.run(instruction)
+    finally:
+        agent.close()
 
     _display_report(report)
 
@@ -38,7 +41,10 @@ def learn(pattern: str = typer.Argument("", help="Instruction pattern to analyze
     from src.agent.core import AgentCore
 
     agent = AgentCore()
-    report = agent.get_learning_report(pattern)
+    try:
+        report = agent.get_learning_report(pattern)
+    finally:
+        agent.close()
 
     console.print(Panel("[bold]Learning Report[/bold]", border_style="green"))
 
@@ -77,7 +83,10 @@ def capabilities():
     from src.agent.core import AgentCore
 
     agent = AgentCore()
-    state = agent.get_memory_state()
+    try:
+        state = agent.get_memory_state()
+    finally:
+        agent.close()
 
     table = Table(title="Registered Capabilities")
     table.add_column("Name", style="cyan")

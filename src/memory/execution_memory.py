@@ -1,11 +1,14 @@
 import json
 from datetime import datetime, timezone
 from typing import Any
-from supabase import Client
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from DB.models import ExecutionLog
 
 
 class ExecutionMemory:
-    def __init__(self, db: Client):
+    def __init__(self, db: Session):
         self.db = db
 
     def log_execution(
@@ -30,30 +33,33 @@ class ExecutionMemory:
             "result_summary": result_summary,
             "executed_at": datetime.now(timezone.utc).isoformat(),
         }
-        response = self.db.table("execution_logs").insert(record).execute()
-        return response.data[0] if response.data else record
+        execution = ExecutionLog(**record)
+        self.db.add(execution)
+        self.db.commit()
+        self.db.refresh(execution)
+        return execution.to_dict()
 
     def find_similar_executions(self, instruction: str, limit: int = 5) -> list[dict]:
-        response = (
-            self.db.table("execution_logs")
-            .select("*")
-            .ilike("instruction", f"%{self._extract_keywords(instruction)}%")
-            .order("executed_at", desc=True)
+        statement = (
+            select(ExecutionLog)
+            .where(ExecutionLog.instruction.ilike(f"%{self._extract_keywords(instruction)}%"))
+            .order_by(ExecutionLog.executed_at.desc())
             .limit(limit)
-            .execute()
         )
-        return response.data or []
+        return [row.to_dict() for row in self.db.scalars(statement)]
 
     def get_execution_stats(self, instruction_pattern: str) -> dict[str, Any]:
-        response = (
-            self.db.table("execution_logs")
-            .select("execution_time_ms, api_calls, status")
-            .ilike("instruction", f"%{instruction_pattern}%")
-            .order("executed_at", desc=True)
+        statement = (
+            select(
+                ExecutionLog.execution_time_ms,
+                ExecutionLog.api_calls,
+                ExecutionLog.status,
+            )
+            .where(ExecutionLog.instruction.ilike(f"%{instruction_pattern}%"))
+            .order_by(ExecutionLog.executed_at.desc())
             .limit(20)
-            .execute()
         )
-        rows = response.data or []
+        rows = self.db.execute(statement).mappings().all()
         if not rows:
             return {"total_runs": 0}
 
@@ -73,28 +79,42 @@ class ExecutionMemory:
         }
 
     def get_failed_approaches(self, instruction: str) -> list[dict]:
-        response = (
-            self.db.table("execution_logs")
-            .select("decomposed_steps, error_context, tools_used")
-            .ilike("instruction", f"%{self._extract_keywords(instruction)}%")
-            .eq("status", "failed")
-            .order("executed_at", desc=True)
+        statement = (
+            select(
+                ExecutionLog.decomposed_steps,
+                ExecutionLog.error_context,
+                ExecutionLog.tools_used,
+            )
+            .where(
+                ExecutionLog.instruction.ilike(
+                    f"%{self._extract_keywords(instruction)}%"
+                ),
+                ExecutionLog.status == "failed",
+            )
+            .order_by(ExecutionLog.executed_at.desc())
             .limit(5)
-            .execute()
         )
-        return response.data or []
+        return [dict(row) for row in self.db.execute(statement).mappings()]
 
     def get_successful_approach(self, instruction: str) -> dict | None:
-        response = (
-            self.db.table("execution_logs")
-            .select("decomposed_steps, tools_used, execution_time_ms, api_calls")
-            .ilike("instruction", f"%{self._extract_keywords(instruction)}%")
-            .eq("status", "success")
-            .order("executed_at", desc=True)
+        statement = (
+            select(
+                ExecutionLog.decomposed_steps,
+                ExecutionLog.tools_used,
+                ExecutionLog.execution_time_ms,
+                ExecutionLog.api_calls,
+            )
+            .where(
+                ExecutionLog.instruction.ilike(
+                    f"%{self._extract_keywords(instruction)}%"
+                ),
+                ExecutionLog.status == "success",
+            )
+            .order_by(ExecutionLog.executed_at.desc())
             .limit(1)
-            .execute()
         )
-        return response.data[0] if response.data else None
+        row = self.db.execute(statement).mappings().first()
+        return dict(row) if row else None
 
     def _extract_keywords(self, instruction: str) -> str:
         stop_words = {"a", "an", "the", "is", "are", "was", "were", "do", "does", "did",

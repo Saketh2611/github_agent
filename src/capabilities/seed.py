@@ -1,8 +1,8 @@
 """Seed base capabilities — minimal set the agent starts with.
 The agent must synthesize anything beyond these at runtime."""
 
-from supabase import create_client
 from src.config import settings
+from DB.database import Database
 from src.memory.capability_memory import CapabilityMemory
 
 BASE_CAPABILITIES = [
@@ -106,20 +106,23 @@ BASE_CAPABILITIES = [
 
 
 def seed_base_capabilities() -> int:
-    db = create_client(settings.supabase_url, settings.supabase_key)
-    memory = CapabilityMemory(db)
-
-    count = 0
-    for cap in BASE_CAPABILITIES:
-        memory.register_capability(
-            name=cap["name"],
-            description=cap["description"],
-            http_method=cap["http_method"],
-            endpoint_template=cap["endpoint_template"],
-            payload_schema=cap["payload_schema"],
-            query_params_schema=cap["query_params_schema"],
-            synthesized=False,
-        )
-        count += 1
-
-    return count
+    db = Database(settings.database_url or None)
+    session = db.create_session()
+    try:
+        memory = CapabilityMemory(session)
+        count = 0
+        for cap in BASE_CAPABILITIES:
+            memory.register_capability(
+                name=cap["name"],
+                description=cap["description"],
+                http_method=cap["http_method"],
+                endpoint_template=cap["endpoint_template"],
+                payload_schema=cap["payload_schema"],
+                query_params_schema=cap["query_params_schema"],
+                synthesized=False,
+            )
+            count += 1
+        return count
+    finally:
+        session.close()
+        db.close()

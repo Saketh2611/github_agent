@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .venv/
+DB/*.sqlite3
 dist/
 *.egg-info/
 .ruff_cache/

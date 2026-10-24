@@ -13,7 +13,6 @@ An autonomous platform intelligence agent that executes natural language instruc
 
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- A [Supabase](https://supabase.com/) project (free tier works)
 - A [GitHub Personal Access Token](https://github.com/settings/tokens)
 - A [Groq API Key](https://console.groq.com/) (primary LLM) or AWS Bedrock access (fallback)
 
@@ -30,9 +29,17 @@ cd AI-Multi-Agent-Workflow
 
 ```bash
 uv venv
-# Windows PowerShell
-.venv\Scripts\activate
-# Linux/macOS
+```
+
+Activate it in Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Or on Linux/macOS:
+
+```bash
 source .venv/bin/activate
 ```
 
@@ -55,7 +62,7 @@ Edit `.env` with your values:
 ```env
 # LLM Provider (Groq is primary, Bedrock is fallback)
 GROQ_API_KEY=gsk_your-groq-api-key
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=openai/gpt-oss-120b
 
 # AWS Bedrock (optional fallback)
 AWS_ACCESS_KEY_ID=your-access-key
@@ -63,9 +70,9 @@ AWS_SECRET_ACCESS_KEY=your-secret-key
 AWS_REGION=ap-south-1
 BEDROCK_MODEL_ID=openai.gpt-oss-20b-1:0
 
-# Supabase (for persistent memory/learning)
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-service-role-key
+# SQLite (for persistent memory/learning)
+DATABASE_URL=sqlite:///DB/github_agent.sqlite3
+# Optional: use sqlite:// for a temporary in-memory database
 
 # GitHub
 GITHUB_TOKEN=ghp_your-personal-access-token
@@ -74,31 +81,28 @@ GITHUB_DEFAULT_REPO=your-target-repo
 ```
 
 **Important notes:**
-- Use the **service role key** (not anon key) for `SUPABASE_KEY` to bypass RLS policies
 - Your GitHub token needs `repo` scope for full access to issues, PRs, etc.
 - `GITHUB_DEFAULT_OWNER` and `GITHUB_DEFAULT_REPO` are used when the instruction says "my repo"
 
 ### 5. Set up the database
 
-Run the SQL migrations in your Supabase project (SQL Editor):
-
-```sql
--- Run these files in order:
--- sql/001_execution_logs.sql
--- sql/002_capabilities.sql
--- sql/003_learning_metrics.sql
-```
-
-Or via the Supabase CLI:
-
-```bash
-supabase db push
-```
+The SQLite database and tables are created automatically on startup in the
+`DB` folder. The default database is persistent; set `DATABASE_URL=sqlite://`
+to use a temporary in-memory database instead.
 
 ### 6. Seed base capabilities
 
+With the virtual environment activated:
+
 ```bash
 agent seed
+```
+
+In Windows PowerShell, you can also run the installed command directly without
+activating the environment:
+
+```powershell
+.\.venv\Scripts\agent.exe seed
 ```
 
 This registers the initial set of API capabilities (list issues, create issues, update issues, comments, PRs, etc.). The agent can synthesize additional capabilities at runtime as needed.
