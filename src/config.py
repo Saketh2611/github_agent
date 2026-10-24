@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 from pydantic_settings import BaseSettings
 
 
@@ -45,7 +46,10 @@ class Settings(BaseSettings):
     github_default_repo: str = ""
 
     model_config = {
-        "env_file": ".env",
+        "env_file": (
+            Path.home() / ".github-agent.env",
+            Path(__file__).resolve().parents[1] / ".env",
+        ),
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

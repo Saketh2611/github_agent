@@ -100,6 +100,13 @@ class SQLiteMemoryTests(unittest.TestCase):
             "list_issues", success=True, constraint="requires repo scope"
         )
         self.capability_memory.record_usage("list_issues", success=False)
+        self.capability_memory.register_capability(
+            name="list_issues",
+            description="List repository issues",
+            http_method="get",
+            endpoint_template="/repos/{owner}/{repo}/issues",
+            query_params_schema={"state": "open|closed"},
+        )
 
         stored = self.capability_memory.find_capability("list_issues")
         self.assertEqual(stored["success_count"], 1)

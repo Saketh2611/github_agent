@@ -95,6 +95,28 @@ BASE_CAPABILITIES = [
         "query_params_schema": None,
     },
     {
+        "name": "push_workspace_changes",
+        "description": "Commit tracked and non-ignored untracked changes from the current local Git repository to a new GitHub branch, then open a pull request; use only when the user explicitly asks to push/create a PR, and provide title, body/description, branch, and base when specified",
+        "http_method": "POST",
+        "endpoint_template": "/repos/{owner}/{repo}/pulls",
+        "payload_schema": {
+            "title": "string",
+            "body": "string (optional; generated from the changes if omitted)",
+            "branch": "string (optional; generated if omitted)",
+            "base": "string (optional; defaults to repository default branch)",
+            "commit_message": "string (optional; defaults to title)",
+        },
+        "query_params_schema": None,
+    },
+    {
+        "name": "explain_pull_changes",
+        "description": "Fetch a pull request and its file patches, then use the LLM to explain what code changes it contains",
+        "http_method": "GET",
+        "endpoint_template": "/repos/{owner}/{repo}/pulls/{pull_number}",
+        "payload_schema": None,
+        "query_params_schema": None,
+    },
+    {
         "name": "list_labels",
         "description": "List labels in a repository",
         "http_method": "GET",

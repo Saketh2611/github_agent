@@ -6,6 +6,7 @@ An autonomous platform intelligence agent that executes natural language instruc
 
 - **Natural Language Execution** — Give instructions in plain English ("close the bug issue", "list open PRs")
 - **Capability Synthesis** — When encountering an unfamiliar API operation, the agent synthesizes the correct API call at runtime
+- **Pull Request Workflow** — Push current local Git changes to a new branch, open a pull request, and generate a change summary from an existing PR's diff
 - **Learning Loop** — Tracks execution history and optimizes future runs by reusing successful strategies
 - **Self-Improving** — Fewer API calls and faster execution on repeated similar instructions
 
@@ -45,17 +46,36 @@ source .venv/bin/activate
 
 ### 3. Install dependencies
 
+For an installation isolated to this project's virtual environment:
+
 ```bash
 uv pip install -e .
 ```
 
+To install `agent` as a user-wide command that does not require activating this
+project's virtual environment, run this from the repository root instead:
+
+```powershell
+uv tool install --editable .
+```
+
+Then `agent` can be run from any directory. If PowerShell does not recognize
+the command immediately after installation, open a new terminal and ensure the
+directory reported by `uv tool dir --bin` is on your user `PATH`.
+
 ### 4. Configure environment variables
 
-Copy the example file and fill in your credentials:
+For project-local credentials, copy the example file and fill in your values:
 
 ```bash
 cp .env.example .env
 ```
+
+The agent loads environment variables first, then configuration from
+`%USERPROFILE%\.github-agent.env` on Windows or `~/.github-agent.env` on
+Linux/macOS, followed by the `.env` next to this clone. It does not load an
+unrelated `.env` from the directory where the global command is run. Keep
+credential files private and out of version control.
 
 Edit `.env` with your values:
 
@@ -106,6 +126,28 @@ activating the environment:
 ```
 
 This registers the initial set of API capabilities (list issues, create issues, update issues, comments, PRs, etc.). The agent can synthesize additional capabilities at runtime as needed.
+Run `agent seed` again after updating the application to register newly added capabilities.
+
+### Create and explain pull requests
+
+From inside the target repository, ask the agent to push the current local
+changes and open a pull request. For example:
+
+```powershell
+agent run "Push my current changes to a new branch and open a PR titled 'Add greeting support' with a description of the changes"
+```
+
+The local Git `origin` must match the target GitHub repository. Tracked changes
+and non-ignored untracked files are included; deleted tracked files are
+propagated. The workflow rejects likely secret files such as `.env` files and
+private-key files, and does not reuse an existing branch.
+
+To have the LLM explain a PR's code changes, include its number in the
+instruction:
+
+```powershell
+agent run "Explain the code changes in PR 42"
+```
 
 ## Usage
 

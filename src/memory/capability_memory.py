@@ -43,8 +43,15 @@ class CapabilityMemory:
             capability = Capability(**record)
             self.db.add(capability)
         else:
-            for key, value in record.items():
-                setattr(capability, key, value)
+            for key in (
+                "description",
+                "http_method",
+                "endpoint_template",
+                "payload_schema",
+                "query_params_schema",
+                "synthesized",
+            ):
+                setattr(capability, key, record[key])
         self.db.commit()
         self.db.refresh(capability)
         return capability.to_dict()

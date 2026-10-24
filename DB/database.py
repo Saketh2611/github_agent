@@ -19,14 +19,22 @@ class Database:
             url = URL.create("sqlite", database=str(database_path))
 
         engine_options: dict = {}
-        if url.get_backend_name() == "sqlite":
-            engine_options["connect_args"] = {"check_same_thread": False}
-            if url.database in (None, "", ":memory:"):
-                engine_options["poolclass"] = StaticPool
-            elif url.database != ":memory:" and not url.database.startswith("file:"):
-                Path(url.database).expanduser().resolve().parent.mkdir(
-                    parents=True, exist_ok=True
-                )
+        if url.get_backend_name() != "sqlite":
+            raise ValueError(
+                "This agent uses SQLite. Set DATABASE_URL to a sqlite:/// URL "
+                "or remove the inherited DATABASE_URL environment variable."
+            )
+
+        engine_options["connect_args"] = {"check_same_thread": False}
+        if url.database in (None, "", ":memory:"):
+            engine_options["poolclass"] = StaticPool
+        elif not url.database.startswith("file:"):
+            database_path = Path(url.database).expanduser()
+            if not database_path.is_absolute():
+                database_path = Path(__file__).resolve().parent.parent / database_path
+            database_path = database_path.resolve()
+            database_path.parent.mkdir(parents=True, exist_ok=True)
+            url = url.set(database=str(database_path))
 
         self.engine: Engine = create_engine(url, **engine_options)
         self._session_factory = sessionmaker(

@@ -10,6 +10,7 @@ Each step must be a concrete API operation on GitHub.
 Consider dependencies between steps (e.g., you need an issue number before you can comment on it).
 
 IMPORTANT: When a capability requires "owner" and "repo" path parameters, use the default owner and repo provided in the context unless the user explicitly specifies a different one.
+Only use a capability that pushes local workspace changes when the user explicitly asks to push code or create a pull request. For PR explanation requests, use the capability that fetches and explains the pull request's code changes.
 
 Respond with ONLY a JSON object, no markdown."""
 

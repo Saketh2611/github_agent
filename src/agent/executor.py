@@ -5,6 +5,11 @@ from typing import Any
 from src.config import settings
 from src.llm import llm
 from src.tools.github_client import GitHubClient, GitHubAPIError
+from src.tools.pull_request_workflow import (
+    PullRequestWorkflowError,
+    push_workspace_changes,
+    summarize_pull_request_changes,
+)
 from src.memory.capability_memory import CapabilityMemory
 
 
@@ -31,7 +36,20 @@ class StepExecutor:
 
         try:
             start = time.time()
-            if method == "GET":
+            if cap_name == "push_workspace_changes":
+                result = push_workspace_changes(self.github, params)
+            elif cap_name == "explain_pull_changes":
+                owner = params.get("owner") or settings.github_default_owner
+                repo = params.get("repo") or settings.github_default_repo
+                pull_number = params.get("pull_number")
+                if not owner or not repo or pull_number is None:
+                    raise PullRequestWorkflowError(
+                        "A pull request number and GitHub owner/repository are required."
+                    )
+                result = summarize_pull_request_changes(
+                    self.github, owner, repo, pull_number
+                )
+            elif method == "GET":
                 query_params = self._extract_query_params(params, capability)
                 result = self.github.get(endpoint, params=query_params)
             elif method == "POST":
@@ -63,6 +81,15 @@ class StepExecutor:
                 "status": "failed",
                 "error": str(e),
                 "status_code": e.status_code,
+                "capability_used": cap_name,
+            }
+        except PullRequestWorkflowError as e:
+            self.capability_memory.record_usage(
+                cap_name, success=False, constraint=str(e)[:100]
+            )
+            return {
+                "status": "failed",
+                "error": str(e),
                 "capability_used": cap_name,
             }
 
