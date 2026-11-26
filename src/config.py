@@ -31,13 +31,8 @@ def _detect_github_repo_from_git() -> tuple[str, str]:
 
 
 class Settings(BaseSettings):
-    groq_api_key: str = ""
-    groq_model: str = "openai/gpt-oss-120b"
-
-    aws_access_key_id: str = ""
-    aws_secret_access_key: str = ""
-    aws_region: str = "ap-south-1"
-    bedrock_model_id: str = "openai.gpt-oss-20b-1:0"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:1.5b"
 
     database_url: str = ""
 

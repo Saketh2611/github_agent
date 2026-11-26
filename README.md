@@ -15,7 +15,7 @@ An autonomous platform intelligence agent that executes natural language instruc
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - A [GitHub Personal Access Token](https://github.com/settings/tokens)
-- A [Groq API Key](https://console.groq.com/) (primary LLM) or AWS Bedrock access (fallback)
+- A local [Ollama](https://ollama.com/) installation with `qwen2.5:1.5b`
 
 ## Setup
 
@@ -80,15 +80,9 @@ credential files private and out of version control.
 Edit `.env` with your values:
 
 ```env
-# LLM Provider (Groq is primary, Bedrock is fallback)
-GROQ_API_KEY=gsk_your-groq-api-key
-GROQ_MODEL=openai/gpt-oss-120b
-
-# AWS Bedrock (optional fallback)
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-AWS_REGION=ap-south-1
-BEDROCK_MODEL_ID=openai.gpt-oss-20b-1:0
+# Ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:1.5b
 
 # SQLite (for persistent memory/learning)
 DATABASE_URL=sqlite:///DB/github_agent.sqlite3
@@ -251,7 +245,7 @@ User Instruction
 ├── src/
 │   ├── cli.py              # Typer CLI commands
 │   ├── config.py           # Settings from .env
-│   ├── llm.py             # LLM client (Groq primary, Bedrock fallback)
+│   ├── llm.py             # Local Ollama LLM client
 │   ├── agent/
 │   │   ├── core.py        # Main agent orchestration
 │   │   ├── planner.py     # NL → steps decomposition
@@ -279,8 +273,7 @@ User Instruction
 | `Not Found` (404) | Check `GITHUB_DEFAULT_OWNER` and `GITHUB_DEFAULT_REPO` in `.env` |
 | `row-level security policy` | Use the Supabase **service role key**, not the anon key |
 | `Capability synthesis failed` | Run `agent seed` to ensure base capabilities exist |
-| `No LLM configured` | Set `GROQ_API_KEY` in `.env` |
-| `Groq unavailable` | The client retries 3 times; check your Groq quota |
+| `Could not reach Ollama` | Start Ollama and run `ollama pull qwen2.5:1.5b` |
 
 ## License
 
