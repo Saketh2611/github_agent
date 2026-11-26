@@ -37,7 +37,7 @@ def run(
 
 @app.command()
 def learn(pattern: str = typer.Argument("", help="Instruction pattern to analyze")):
-    """Show the learning report — measurable improvement over time."""
+    """Show the learning report and measurable improvement over time."""
     from src.agent.core import AgentCore
 
     agent = AgentCore()
@@ -72,7 +72,7 @@ def learn(pattern: str = typer.Argument("", help="Instruction pattern to analyze
     if report["improvement_signals"]:
         console.print("\n[bold green]Improvement Signals:[/bold green]")
         for signal in report["improvement_signals"]:
-            console.print(f"  ✓ {signal}")
+            console.print(f"  + {signal}")
     else:
         console.print("\n[yellow]No improvement signals yet (need more runs).[/yellow]")
 
@@ -139,13 +139,27 @@ def _display_report(report):
         icon = {"success": "[green]OK[/green]", "failed": "[red]FAIL[/red]", "skipped": "[dim]SKIP[/dim]"}.get(result["status"], "?")
         console.print(f"  {icon} Step {i}: {step['description']} [{result['status']}]")
         if result.get("error"):
-            console.print(f"    [red]→ {result['error'][:120]}[/red]")
+            console.print(f"    [red]-> {result['error'][:120]}[/red]")
+        elif result.get("reason"):
+            console.print(f"    [dim]{result['reason']}[/dim]")
         if result.get("data"):
             _display_data(result["data"])
 
 
-def _display_data(data):
+def _display_data(data, capability_used=None):
     """Display API response data in a readable format."""
+    if isinstance(data, dict) and "explanation" in data:
+        console.print(f"\n  [bold]#{data.get('number', '')} {data.get('title', '')}[/bold]")
+        if data.get("html_url"):
+            console.print(f"  {data['html_url']}")
+        console.print(f"\n  {data['explanation']}")
+        if data.get("files"):
+            console.print("\n  [bold]Changed files:[/bold]")
+            for file in data["files"]:
+                console.print(
+                    f"    {file.get('filename')} (+{file.get('additions', 0)} -{file.get('deletions', 0)})"
+                )
+        return
     if isinstance(data, dict) and "items" in data and isinstance(data["items"], list):
         data = data["items"]
     if isinstance(data, list):
@@ -159,7 +173,10 @@ def _display_data(data):
                     state = item.get("state", "")
                     labels = ", ".join(l["name"] for l in item.get("labels", []) if isinstance(l, dict))
                     label_str = f" [dim]\\[{labels}][/dim]" if labels else ""
+                    url = item.get("html_url", "")
                     console.print(f"    #{item['number']} {item['title']} [dim]({state}){label_str}[/dim]")
+                    if url:
+                        console.print(f"      {url}")
                 elif "filename" in item and "additions" in item:
                     status = item.get("status", "")
                     console.print(f"    {item['filename']} (+{item['additions']} -{item['deletions']}) [dim]({status})[/dim]")

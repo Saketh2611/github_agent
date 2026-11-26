@@ -54,9 +54,23 @@ class StepExecutor:
                 result = self.github.get(endpoint, params=query_params)
             elif method == "POST":
                 payload = self._build_payload(params, capability)
+                missing = self._missing_required_payload_fields(payload, capability)
+                if missing:
+                    return {
+                        "status": "failed",
+                        "error": f"Missing required payload field(s): {', '.join(missing)}",
+                        "capability_used": cap_name,
+                    }
                 result = self.github.post(endpoint, json_data=payload)
             elif method == "PATCH":
                 payload = self._build_payload(params, capability)
+                missing = self._missing_required_payload_fields(payload, capability)
+                if missing:
+                    return {
+                        "status": "failed",
+                        "error": f"Missing required payload field(s): {', '.join(missing)}",
+                        "capability_used": cap_name,
+                    }
                 result = self.github.patch(endpoint, json_data=payload)
             elif method == "DELETE":
                 result = self.github.delete(endpoint)
@@ -183,7 +197,34 @@ class StepExecutor:
     def _build_payload(self, params: dict, capability: dict) -> dict:
         """Build the request payload, excluding path parameters."""
         path_params = self._get_path_params(capability["endpoint_template"])
-        return {k: v for k, v in params.items() if k not in path_params}
+        payload = {k: v for k, v in params.items() if k not in path_params}
+        # The planner sometimes uses descriptive names even when a GitHub
+        # endpoint requires the canonical REST field names.
+        aliases = {
+            "issue_title": "title",
+            "issue_body": "body",
+        }
+        for alias, canonical in aliases.items():
+            if alias in payload and canonical not in payload:
+                payload[canonical] = payload.pop(alias)
+        return payload
+
+    def _missing_required_payload_fields(self, payload: dict, capability: dict) -> list[str]:
+        """Reject malformed writes locally instead of sending doomed API calls."""
+        schema = capability.get("payload_schema") or {}
+        schema = json.loads(schema) if isinstance(schema, str) else schema
+        required = {
+            name
+            for name, description in schema.items()
+            if "required" in str(description).lower()
+        }
+        # Some existing local capability rows were seeded without schemas.
+        required.update({"create_pull": {"title", "head", "base"}}.get(capability.get("name"), set()))
+        return [
+            name
+            for name in required
+            if name not in payload
+        ]
 
     def _get_path_params(self, template: str) -> set:
         """Extract path parameter names from endpoint template."""

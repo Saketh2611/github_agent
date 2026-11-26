@@ -1,5 +1,6 @@
 import time
 import json
+import re
 from typing import Any
 from dataclasses import dataclass, field
 
@@ -84,6 +85,23 @@ class AgentCore:
         for step in steps:
             step_num = step["step_number"]
 
+            # The planner is probabilistic. Never let it turn an unrelated
+            # suggestion into a GitHub write the user did not request.
+            capability = self.capability_memory.find_capability(
+                step.get("capability_name", "")
+            )
+            if capability and capability.get("http_method") != "GET" and not self._write_is_authorized(
+                instruction, step.get("capability_name", "")
+            ):
+                result = {
+                    "status": "skipped",
+                    "reason": "write_not_authorized_by_instruction",
+                    "capability_used": step.get("capability_name"),
+                }
+                step_results.append({"step": step, "result": result})
+                prior_results[step_num] = result
+                continue
+
             # Check dependencies
             deps = step.get("depends_on", [])
             dep_failed = any(
@@ -108,6 +126,21 @@ class AgentCore:
                     prior_results[step_num] = result
                     continue
 
+            capability = self.capability_memory.find_capability(
+                step.get("capability_name", "")
+            )
+            if capability and capability.get("http_method") != "GET" and not self._write_is_authorized(
+                instruction, step.get("capability_name", "")
+            ):
+                result = {
+                    "status": "skipped",
+                    "reason": "write_not_authorized_by_instruction",
+                    "capability_used": step.get("capability_name"),
+                }
+                step_results.append({"step": step, "result": result})
+                prior_results[step_num] = result
+                continue
+
             # Execute the step
             result = self.executor.execute_step(step, prior_results)
 
@@ -117,14 +150,24 @@ class AgentCore:
                 if cap:
                     step["capability_name"] = cap["name"]
                     synthesized.append(cap["name"])
-                    result = self.executor.execute_step(step, prior_results)
+                    capability = self.capability_memory.find_capability(cap["name"])
+                    if capability and capability.get("http_method") != "GET" and not self._write_is_authorized(
+                        instruction, cap["name"]
+                    ):
+                        result = {
+                            "status": "skipped",
+                            "reason": "write_not_authorized_by_instruction",
+                            "capability_used": cap["name"],
+                        }
+                    else:
+                        result = self.executor.execute_step(step, prior_results)
 
             step_results.append({"step": step, "result": result})
             prior_results[step_num] = result
 
         # Phase 4: Determine overall status
         statuses = [r["result"]["status"] for r in step_results]
-        if all(s == "success" for s in statuses):
+        if statuses and all(s in ("success", "skipped") for s in statuses) and "success" in statuses:
             overall_status = "success"
         elif any(s == "success" for s in statuses):
             overall_status = "partial_success"
@@ -150,6 +193,40 @@ class AgentCore:
         )
 
         return report
+
+    @staticmethod
+    def _write_is_authorized(instruction: str, capability_name: str) -> bool:
+        """Require explicit, non-negated intent for each kind of GitHub write."""
+        text = instruction.lower()
+        # Read-only and explicit no-change wording overrides incidental verbs.
+        if re.search(r"\b(read[- ]only|do not modify|don't modify|without modifying)\b", text):
+            return False
+        intents = {
+            "create_issue": r"\b(create|open|file|submit)\b.{0,35}\b(issue|issues)\b",
+            "create_pull": r"\b(create|open|submit)\b.{0,35}\b(pull request|pull requests|pr|prs)\b",
+            "push_workspace_changes": r"\b(push|create|open|submit)\b.{0,50}\b(pull request|pull requests|pr|prs|changes)\b",
+            "create_issue_comment": r"\b(add|post|write|leave)\b.{0,35}\b(comment|comments)\b",
+            "update_issue": r"\b(update|edit|close|reopen)\b.{0,35}\b(issue|issues)\b",
+        }
+        pattern = intents.get(capability_name)
+        if not pattern or not re.search(pattern, text):
+            return False
+        target = {
+            "create_issue": r"issues?",
+            "create_pull": r"pull requests?|prs?",
+            "push_workspace_changes": r"pull requests?|prs?|changes",
+            "create_issue_comment": r"comments?",
+            "update_issue": r"issues?",
+        }.get(capability_name, r"\w+")
+        negated_intent = re.search(
+            rf"\b(?:do not|don't|never)\s+(?:create|open|modify|update|add|post|push)\b(.{{0,50}})\b(?:{target})\b",
+            text,
+        )
+        if negated_intent and not re.search(
+            r"\b(?:any other|another|additional|more)\b", negated_intent.group(1)
+        ):
+            return False
+        return True
 
     def _attempt_synthesis(self, description: str) -> dict | None:
         """Try to synthesize a new capability for the described need."""
